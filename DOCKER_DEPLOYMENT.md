@@ -122,9 +122,117 @@ sudo apt install curl wget -y
 
 ## 4. 프로젝트 배포
 
-### 4.1 프로젝트 가져오기
+### 4.1 배포 방법 선택
 
-**방법 1: Git Clone (권장)**
+두 가지 배포 방법이 있습니다:
+
+**방법 1: Docker Hub를 통한 배포 (권장)**
+- 로컬에서 빌드 → Docker Hub 푸시 → EC2에서 pull
+- EC2 메모리 사용량 최소화
+- 빌드 속도 빠름
+- **t2.micro 인스턴스에서 권장**
+
+**방법 2: EC2에서 직접 빌드**
+- EC2에서 소스코드 빌드
+- 빌드 시간 오래 걸림
+- **t2.medium 이상 권장**
+
+---
+
+### 4.2 방법 1: Docker Hub를 통한 배포 (권장)
+
+#### 4.2.1 로컬에서 이미지 빌드 및 푸시
+
+**1단계: Docker Hub 계정 준비**
+
+[Docker Hub](https://hub.docker.com/)에서 계정을 만들어주세요.
+
+**2단계: 로컬에서 빌드 및 푸시**
+
+```bash
+# Windows (로컬 프로젝트 폴더에서)
+cd c:\Projects\game_news
+
+# 실행 권한 부여 (Git Bash)
+chmod +x docker-build-push.sh
+
+# 빌드 및 푸시 스크립트 실행
+./docker-build-push.sh
+```
+
+스크립트 실행 중:
+- Docker Hub 사용자명 입력
+- 이미지 태그 입력 (기본값: latest)
+- Docker Hub 로그인
+- 3개 서비스 순차적 빌드 (백엔드 → 프론트엔드 → Nginx)
+- Docker Hub에 푸시
+
+**3단계: EC2로 설정 파일 전송**
+
+```bash
+# Git Bash에서 실행
+scp -i your-key.pem .env.prod ubuntu@YOUR_EC2_PUBLIC_IP:~/
+scp -i your-key.pem docker-compose.prod.yml ubuntu@YOUR_EC2_PUBLIC_IP:~/game_news/
+scp -i your-key.pem docker-deploy-prod.sh ubuntu@YOUR_EC2_PUBLIC_IP:~/game_news/
+```
+
+또는 Git을 사용하는 경우:
+
+```bash
+# EC2에서
+cd ~/game_news
+git pull
+```
+
+**4단계: EC2에서 배포**
+
+```bash
+# EC2 SSH 접속
+ssh -i your-key.pem ubuntu@YOUR_EC2_PUBLIC_IP
+
+# 프로젝트 폴더로 이동
+cd ~/game_news
+
+# 설정 파일 확인
+cat .env.prod
+
+# 실행 권한 부여
+chmod +x docker-deploy-prod.sh
+
+# 배포 실행
+./docker-deploy-prod.sh
+```
+
+스크립트가 자동으로:
+1. 기존 컨테이너 중지
+2. Docker Hub에서 이미지 pull
+3. 컨테이너 시작
+4. 헬스체크 대기
+5. 상태 확인
+
+#### 4.2.2 코드 업데이트 시
+
+로컬에서 코드 수정 후:
+
+```bash
+# 1. 로컬에서 빌드 및 푸시
+./docker-build-push.sh
+
+# 2. EC2에서 재배포
+ssh -i your-key.pem ubuntu@YOUR_EC2_PUBLIC_IP
+cd ~/game_news
+./docker-deploy-prod.sh
+```
+
+---
+
+### 4.3 방법 2: EC2에서 직접 빌드
+
+**주의**: t2.micro에서는 메모리 부족으로 빌드 실패할 수 있습니다.
+
+#### 4.3.1 프로젝트 가져오기
+
+**Git Clone (권장)**
 
 ```bash
 cd ~
@@ -132,38 +240,47 @@ git clone YOUR_REPOSITORY_URL
 cd game_news
 ```
 
-**방법 2: SCP로 파일 전송**
+**SCP로 파일 전송**
 
 로컬 터미널에서:
 ```bash
 scp -i your-key.pem -r c:\Projects\game_news ubuntu@YOUR_EC2_PUBLIC_IP:~/
 ```
 
-### 4.2 환경 변수 설정 (선택사항)
-
-프로덕션 환경에 맞게 설정을 조정할 수 있습니다:
+#### 4.3.2 스왑 메모리 추가 (t2.small 이하)
 
 ```bash
-# docker-compose.yml의 환경 변수 확인 및 수정
-nano docker-compose.yml
+# 2GB 스왑 파일 생성
+sudo dd if=/dev/zero of=/swapfile bs=128M count=16
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+
+# 부팅 시 자동 마운트
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+
+# 확인
+free -h
 ```
 
-### 4.3 배포 스크립트 실행
+#### 4.3.3 배포 스크립트 실행
 
 ```bash
 # 실행 권한 부여
 chmod +x docker-deploy.sh docker-stop.sh docker-restart.sh
 
-# 배포 실행
+# 배포 실행 (순차 빌드)
 ./docker-deploy.sh
 ```
 
 스크립트가 자동으로:
 1. 기존 컨테이너 중지
-2. 이미지 빌드
+2. 백엔드 빌드 → 프론트엔드 빌드 → Nginx 빌드 (순차적)
 3. 컨테이너 시작
 4. 헬스체크 대기
 5. 상태 확인
+
+---
 
 ### 4.4 배포 확인
 
