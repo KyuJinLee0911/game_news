@@ -1,0 +1,10 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: gamenews
+
+# CORS 설정을 위해 application.yml에 추가
+cors:
+  allowed-origins: "*"
