@@ -49,9 +49,18 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
     docker compose down --rmi all
 fi
 
-# Build and start containers
-print_message "Building and starting containers..."
-docker compose up -d --build
+# Build and start containers sequentially to reduce memory usage
+print_message "Building backend service (Step 1/3)..."
+docker compose build backend
+
+print_message "Building frontend service (Step 2/3)..."
+docker compose build frontend
+
+print_message "Building nginx service (Step 3/3)..."
+docker compose build nginx
+
+print_message "Starting all containers..."
+docker compose up -d
 
 # Wait for services to be healthy
 print_message "Waiting for services to be healthy..."
