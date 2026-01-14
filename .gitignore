@@ -1,0 +1,151 @@
+# ===========================================
+# 게임 뉴스 프로젝트 .gitignore
+# ===========================================
+
+# ========== Security (절대 커밋 금지!) ==========
+# SSH Keys & Certificates
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.jks
+*.keystore
+
+# Environment Variables
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+.env*.local
+
+# AWS Credentials
+.aws/
+
+# Secrets
+secrets/
+*.secret
+credentials.json
+service-account.json
+
+# ========== Logs ==========
+*.log
+logs/
+*.log.*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+security-report-*.txt
+app.log
+nohup.out
+
+# ========== Docker ==========
+volumes/
+docker-compose.override.yml
+
+# ========== Spring Boot (Backend) ==========
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+# Maven (if used)
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+
+# Spring Boot JAR/WAR
+*.jar
+*.war
+*.ear
+!gradle-wrapper.jar
+
+# ========== Next.js (Frontend) ==========
+# Dependencies
+/node_modules
+node_modules/
+/.pnp
+.pnp.*
+
+# Next.js
+/.next/
+/out/
+.next/
+out/
+
+# Production
+/build
+build/
+dist/
+
+# Testing
+/coverage
+coverage/
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Vercel
+.vercel
+
+# ========== IDE ==========
+# IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+
+# VSCode
+.vscode/
+*.code-workspace
+
+# Eclipse
+.classpath
+.factorypath
+.project
+.settings/
+.springBeans
+.sts4-cache
+bin/
+
+# ========== OS ==========
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+
+# ========== Backup & Temp ==========
+*.backup
+*.bak
+*.tmp
+*.swp
+*.swo
+backups/
+nul
+
+# ========== Database (로컬 DB 사용 시) ==========
+*.db
+*.sqlite
+*.sqlite3
+
+# ========== Custom ==========
+TODO.md
+NOTES.md
+scratch/
