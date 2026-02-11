@@ -38,7 +38,29 @@ export default function NewsList({ initialNews }: NewsListProps) {
       const response = await fetch('/api/news/share-text');
       if (response.ok) {
         const text = await response.text();
-        await navigator.clipboard.writeText(text);
+
+        // Modern clipboard API (HTTPS required)
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+        }
+        // Fallback for older browsers or non-HTTPS
+        else {
+          const textArea = document.createElement('textarea');
+          textArea.value = text;
+          textArea.style.position = 'fixed';
+          textArea.style.left = '-999999px';
+          textArea.style.top = '-999999px';
+          document.body.appendChild(textArea);
+          textArea.focus();
+          textArea.select();
+
+          try {
+            document.execCommand('copy');
+          } finally {
+            textArea.remove();
+          }
+        }
+
         setCopySuccess(true);
         setTimeout(() => setCopySuccess(false), 3000);
       }
