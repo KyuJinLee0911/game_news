@@ -12,6 +12,9 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    default:
+      run:
+        working-directory: gamenews
 
     steps:
       - name: 코드 체크아웃
