@@ -5,6 +5,20 @@ spring:
   application:
     name: gamenews
 
+management:
+  endpoints:
+    web:
+      exposure:
+        exclude: health, info
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: never
+    info:
+      enabled: true
+  server:
+    port: ${MANAGEMENT_PORT:8081}
+
 # CORS 설정을 위해 application.yml에 추가
 cors:
-  allowed-origins: "*"
+  allowed-origins: ${ALLOWED_ORIGIN}, http://localhost:3000

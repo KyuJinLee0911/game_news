@@ -14,7 +14,7 @@ import java.time.Duration;
 public class CacheConfig {
     @Bean
     public CacheManager cacheManager() {
-        CaffeineCacheManager mgr = new CaffeineCacheManager("gameNews");
+        CaffeineCacheManager mgr = new CaffeineCacheManager("priorityNews");
         mgr.setCaffeine(
                 Caffeine.newBuilder()
                         .expireAfterWrite(Duration.ofSeconds(300))
