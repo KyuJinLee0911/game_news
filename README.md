@@ -202,6 +202,123 @@ chmod +x security-check.sh
 - **애플리케이션 보안**: CORS 설정, Security Headers, 입력 검증
 - **인프라 보안**: SSH 강화, 최소 권한, 정기 업데이트
 
+## 테스트
+
+### 테스트 실행
+
+```bash
+cd gamenews
+./gradlew test
+```
+
+### 테스트 현황 요약
+
+| 분류 | 파일 | 테스트 메서드 수 |
+|------|------|:--------------:|
+| 통합 테스트 | `GamenewsApplicationTests` | 1 |
+| 통합 테스트 | `NewsControllerTest` | 3 |
+| 단위 테스트 | `GameNewsServiceTest` | 6 |
+| 단위 테스트 | `NewsFilterServiceTest` | 15 |
+| **합계** | | **25** |
+
+- **전체 테스트 메서드**: 25개
+- **단위 테스트**: 21개 (`GameNewsServiceTest` 6개 + `NewsFilterServiceTest` 15개)
+- **통합 테스트**: 4개 (`GamenewsApplicationTests` 1개 + `NewsControllerTest` 3개)
+- **파라미터화 테스트 포함 실제 실행 케이스**: 33개
+
+---
+
+### 단위 테스트 (Unit Test)
+
+#### GameNewsServiceTest — RSS 뉴스 수집 서비스 (6개)
+
+Mockito로 `WebClient`를 Mock 처리하고, RSS 파싱·필터링·에러 처리 로직을 검증합니다.
+
+| 테스트 메서드 | 설명 |
+|--------------|------|
+| `fetchRssData_success` | 정상 RSS 응답에서 뉴스를 수집하고 뱃지·제목·링크가 올바른지 검증 |
+| `fetchRssData_filtersBlacklisted` | `[공략]` 등 블랙리스트 키워드 포함 뉴스가 제외되는지 검증 |
+| `fetchRssData_respectsCount` | `count` 파라미터 제한을 초과하지 않고 수집을 멈추는지 검증 |
+| `fetchRssData_emptyResponse` | 빈 RSS 응답 시 빈 리스트를 반환하는지 검증 |
+| `fetchRssData_apiFailure` | API 호출 실패 시 예외 대신 빈 리스트를 반환하는지 검증 |
+| `fetchRssData_filtersInvalidSummary` | 10자 미만의 유효하지 않은 요약을 가진 뉴스가 제외되는지 검증 |
+
+#### NewsFilterServiceTest — 뉴스 필터링 유틸리티 (15개 메서드 / 27개 케이스)
+
+외부 의존성 없이 순수 유틸리티 메서드를 검증합니다. `@Nested`로 기능별 그룹화, `@ParameterizedTest`로 다양한 입력값을 커버합니다.
+
+**`IsCleanNewsTest` — 제목 블랙리스트 필터링 (3개 메서드, 10개 케이스)**
+
+| 테스트 메서드 | 설명 |
+|--------------|------|
+| `cleanTitlePasses` | 정상 게임 뉴스 제목이 필터를 통과하는지 검증 |
+| `blacklistedTitleFilltered` | `[공략]`, `점검`, `이벤트`, `모집` 등 블랙리스트 키워드 5종 파라미터화 검증 |
+| `nullOrEmptyTitleFiltered` | null 및 빈 문자열 제목이 필터링되는지 검증 |
+
+**`IsValidSummaryTest` — 요약 유효성 검증 (4개 메서드, 8개 케이스)**
+
+| 테스트 메서드 | 설명 |
+|--------------|------|
+| `validSummaryPasses` | 10자 이상의 정상 요약이 통과하는지 검증 |
+| `invalidPatternFiltered` | `게임뉴스 인벤`, `게임뉴스`, `인벤` 등 무의미한 패턴 3종 파라미터화 검증 |
+| `shortSummaryFiltered` | 10자 미만 짧은 요약이 필터링되는지 검증 |
+| `nullOrEmptyFiltered` | null 및 빈 요약이 필터링되는지 검증 |
+
+**`ResolveSourceBadgeTest` — 출처 뱃지 매핑 (5개 메서드)**
+
+| 테스트 메서드 | 설명 |
+|--------------|------|
+| `invenBadge` | "인벤" 포함 제목 → `🛡️ [인벤]` 반환 검증 |
+| `tigBadge` | "디스이즈게임" 포함 제목 → `🎮 [TIG]` 반환 검증 |
+| `mecaBadge` | "게임메카" 포함 제목 → `🤖 [메카]` 반환 검증 |
+| `dongaBadge` | "게임동아" 포함 제목 → `📰 [동아]` 반환 검증 |
+| `defaultBadge` | 알 수 없는 출처 → 기본 뱃지 반환 검증 |
+
+**`CleanTitleTest` — 출처 문자열 제거 (3개 메서드)**
+
+| 테스트 메서드 | 설명 |
+|--------------|------|
+| `removeInven` | 제목에서 `- 인벤` 문자열이 제거되는지 검증 |
+| `removeTig` | 제목에서 `- 디스이즈게임` 문자열이 제거되는지 검증 |
+| `noSourceUnchanged` | 출처가 없는 제목은 그대로 유지되는지 검증 |
+
+---
+
+### 통합 테스트 (Integration Test)
+
+#### GamenewsApplicationTests — 애플리케이션 컨텍스트 (1개)
+
+| 테스트 메서드 | 설명 |
+|--------------|------|
+| `contextLoads` | `@SpringBootTest`로 전체 애플리케이션 컨텍스트가 정상 로드되는지 검증 |
+
+#### NewsControllerTest — REST API 엔드포인트 (3개)
+
+`@WebMvcTest`와 `MockMvc`를 사용하여 컨트롤러 레이어를 검증합니다. `GameNewsService`는 `@MockitoBean`으로 처리합니다.
+
+| 테스트 메서드 | 설명 |
+|--------------|------|
+| `getNews_returnsJsonList` | `GET /api/news` 호출 시 JSON 배열 형식과 뱃지·제목·링크 값이 올바른지 검증 |
+| `getNews_emptyList` | 뉴스가 없을 때 `GET /api/news`가 빈 배열을 반환하는지 검증 |
+| `getShareText_returnsFormattedTest` | `GET /api/news/share-text` 호출 시 `text/plain` 형식의 포맷된 텍스트가 반환되는지 검증 |
+
+---
+
+### 적용 테스트 기법
+
+| 기법 | 적용 위치 | 용도 |
+|------|----------|------|
+| `@SpringBootTest` | GamenewsApplicationTests | 전체 컨텍스트 통합 테스트 |
+| `@WebMvcTest` | NewsControllerTest | MVC 레이어 슬라이스 테스트 |
+| `@ExtendWith(MockitoExtension.class)` | GameNewsServiceTest | Mockito 기반 단위 테스트 |
+| `@MockitoBean` | NewsControllerTest | 서비스 계층 Mock 처리 |
+| `@Nested` | NewsFilterServiceTest | 기능별 테스트 그룹화 |
+| `@ParameterizedTest` | NewsFilterServiceTest | 다양한 입력값 일괄 검증 |
+| `@NullAndEmptySource` | NewsFilterServiceTest | null·빈 문자열 엣지 케이스 검증 |
+| AssertJ | 전체 | 가독성 높은 Fluent 단언문 |
+
+---
+
 ## 라이센스
 
 MIT

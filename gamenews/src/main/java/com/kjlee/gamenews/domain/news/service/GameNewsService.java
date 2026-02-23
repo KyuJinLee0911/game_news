@@ -4,7 +4,9 @@ import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.kjlee.gamenews.domain.news.dto.GameNewsDto;
 import com.kjlee.gamenews.domain.news.dto.Item;
 import com.kjlee.gamenews.domain.news.dto.RssResponse;
+import com.kjlee.gamenews.domain.news.utils.NewsFilterService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -16,22 +18,13 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class GameNewsService {
     private final WebClient webClient;
     private final XmlMapper xmlMapper;
-    String[] blacklist = {"[공략]", "기사리스트", "자유게시판", "질문", "잡담",
-            "유머", "공지", "모집", "점검", "당첨자", "이벤트"};
-
-    private boolean isCleanNews(String title) {
-        for (String s : blacklist) {
-            if (title.contains(s)) {
-                return false;
-            }
-        }
-        return true;
-    }
+    private final NewsFilterService newsFilter;
 
     private String safe(String s) {
         return (s == null) ? "" : s;
@@ -50,13 +43,8 @@ public class GameNewsService {
 
             if (xml == null || xml.isBlank()) return List.of();
 
-            System.out.println(xml);
 
             RssResponse rss = xmlMapper.readValue(xml, RssResponse.class);
-
-            System.out.println("channel null? " + (rss.channel() == null));
-            System.out.println("items null? " + (rss.channel() == null || rss.channel().getItems() == null));
-            System.out.println("items size = " + (rss.channel() == null || rss.channel().getItems() == null ? -1 : rss.channel().getItems().size()));
 
             List<Item> items = (rss != null && rss.channel() != null) ? rss.channel().getItems() : null;
             if (items == null || items.isEmpty()) return List.of();
@@ -68,26 +56,10 @@ public class GameNewsService {
                 String rawTitle = safe(item.title());
                 String link = safe(item.link()).trim();
 
-                if (!isCleanNews(rawTitle)) continue;
+                if (!newsFilter.isCleanNews(rawTitle)) continue;
 
-                String sourceBadge = (badgePrefix != null) ? badgePrefix : "\uD83D\uDCF0";
-                String cleanTitle = rawTitle;
-
-                if (rawTitle.contains("인벤") || rawTitle.contains("Inven")) {
-                    sourceBadge = "\uD83D\uDEE1\uFE0F [인벤]";
-                    cleanTitle = cleanTitle.replace("- 인벤", "").replace("- Inven", "");
-                } else if (rawTitle.contains("디스이즈게임") || rawTitle.contains("Thisisgame")) {
-                    sourceBadge = "\uD83C\uDFAE [TIG]";
-                    cleanTitle = cleanTitle.replace("- 디스이즈게임", "").replace("- Thisisgame", "");
-                } else if (rawTitle.contains("게임메카")) {
-                    sourceBadge = "\uD83E\uDD16 [메카]";
-                    cleanTitle = cleanTitle.replace("- 게임메카", "");
-                } else if (rawTitle.contains("게임동아")) {
-                    sourceBadge = "\uD83D\uDCF0 [동아]";
-                    cleanTitle = cleanTitle.replace("- 게임동아", "");
-                }
-
-                cleanTitle = cleanTitle.trim();
+                String sourceBadge = newsFilter.resolveSourceBadge(rawTitle, badgePrefix);
+                String cleanTitle = newsFilter.cleanTitle(rawTitle);
 
                 String summary;
                 try {
@@ -97,6 +69,9 @@ public class GameNewsService {
                 } catch (Exception e) {
                     summary = "기사 원문 보러가기";
                 }
+
+                // 의미 없는 summary를 가진 뉴스 제외
+                if (!newsFilter.isValidSummary(summary)) continue;
 
                 String date;
                 try {
@@ -111,7 +86,7 @@ public class GameNewsService {
             }
             return collected;
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("기사 정보를 받아오는 데 실패했습니다. {}", e.getMessage(), e);
             return List.of();
         }
     }
@@ -122,10 +97,9 @@ public class GameNewsService {
     }
 
     public List<GameNewsDto> fetchPrioirtyNewsNoCache() {
-        List<GameNewsDto> finalList = new ArrayList<>();
 
         List<GameNewsDto> tig = fetchRssData("site:thisisgame.com/articles?newsId=263", 8, "🎮 [TIG]");
-        finalList.addAll(tig);
+        List<GameNewsDto> finalList = new ArrayList<>(tig);
 
         String otherQuery = "site:inven.co.kr/webzine/news OR site:gamemeca.com/view.php OR site:game.donga.com";
         List<GameNewsDto> other = fetchRssData(otherQuery, 12, null);
