@@ -9,7 +9,7 @@ management:
   endpoints:
     web:
       exposure:
-        exclude: health, info
+        include: health, info
       base-path: /actuator
   endpoint:
     health:
