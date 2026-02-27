@@ -14,6 +14,7 @@
 
 # Environment Variables
 .env
+.env.*
 .env.local
 .env.development
 .env.test
@@ -131,6 +132,9 @@ $RECYCLE.BIN/
 *~
 .directory
 
+# ========== Claude Code ==========
+.claude/
+
 # ========== Backup & Temp ==========
 *.backup
 *.bak
@@ -149,3 +153,4 @@ nul
 TODO.md
 NOTES.md
 scratch/
+PORTFOLIO_IMPROVEMENT.md

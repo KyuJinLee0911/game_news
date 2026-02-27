@@ -55,6 +55,7 @@ services:
       - DB_NAME=${DB_NAME:-gamenews}
       - DB_USER=${DB_USER:-gamenews}
       - DB_PASSWORD=${DB_PASSWORD}
+      - ALLOWED_ORIGIN=${ALLOWED_ORIGIN}
     ports:
       - "8080:8080"
     networks:
