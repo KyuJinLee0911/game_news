@@ -2,6 +2,9 @@ package com.kjlee.gamenews.domain.news.service;
 
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.kjlee.gamenews.domain.news.dto.GameNewsDto;
+import com.kjlee.gamenews.domain.news.entitiy.GameNews;
+import com.kjlee.gamenews.domain.news.repository.CrawlHistoryRepository;
+import com.kjlee.gamenews.domain.news.repository.GameNewsRepository;
 import com.kjlee.gamenews.domain.news.utils.NewsFilterService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -16,10 +19,12 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 public class GameNewsServiceTest {
+    private GameNewsService gameNewsService;
     private final XmlMapper xmlMapper = new XmlMapper();
     private final NewsFilterService newsFilter = new NewsFilterService();
     @Mock
@@ -30,11 +35,14 @@ public class GameNewsServiceTest {
     private WebClient.RequestHeadersSpec requestHeadersSpec;
     @Mock
     private WebClient.ResponseSpec responseSpec;
-    private GameNewsService gameNewsService;
+    @Mock
+    private GameNewsRepository gameNewsRepository;
+    @Mock
+    private CrawlHistoryRepository crawlHistoryRepository;
 
     @BeforeEach
     void SetUp() {
-        gameNewsService = new GameNewsService(webClient, xmlMapper, newsFilter);
+        gameNewsService = new GameNewsService(webClient, xmlMapper, newsFilter, gameNewsRepository, crawlHistoryRepository);
     }
 
     private void mockWebClientResponse(String xmlResponse) {
@@ -153,5 +161,66 @@ public class GameNewsServiceTest {
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).title()).isEqualTo("좋은 뉴스");
+    }
+
+    @Test
+    @DisplayName("수집된 뉴스가 DB에 저장된다.")
+    void fetchRssData_saveToDb() {
+        String xml = buildRssXml(
+                buildItem("메이플 업데이트 - 인벤", "https://example.com/1",
+                        "메이플스토리가 대규모 여름 업데이트를 발표했다", "Mon, 10 Feb 2026 12:00")
+        );
+        mockWebClientResponse(xml);
+        when(gameNewsRepository.existsByLink(any())).thenReturn(false);
+
+        gameNewsService.fetchRssData("메이플", 10, null);
+
+        verify(gameNewsRepository).save(any(GameNews.class));
+    }
+
+    @Test
+    @DisplayName("이미 DB에 있는 뉴스는 중복 저장하지 않는다.")
+    void fetchRssData_skipsDuplicate() {
+        String xml = buildRssXml(
+                buildItem("메이플 업데이트 - 인벤", "https://example.com/1",
+                        "메이플스토리가 대규모 여름 업데이트를 발표했다", "Mon, 10 Feb 2026 12:00")
+        );
+        mockWebClientResponse(xml);
+        when(gameNewsRepository.existsByLink("https://example.com/1")).thenReturn(true);
+
+        List<GameNewsDto> result = gameNewsService.fetchRssData("메이플", 10, null);
+
+        assertThat(result).isEmpty();
+        verify(gameNewsRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("크롤링 성공 시 이력이 저장된다.")
+    void fetchRssData_savesCrawlHistoryOnSuccess() {
+        String xml = buildRssXml(
+                buildItem("뉴스 제목 - 인벤", "https://example.com/1",
+                        "충분히 긴 유효한 뉴스 요약문입니다", "Mon, 10 Feb 2026 12:00")
+        );
+
+        mockWebClientResponse(xml);
+        when(gameNewsRepository.existsByLink(any())).thenReturn(false);
+
+        gameNewsService.fetchRssData("게임", 10, null);
+
+        verify(crawlHistoryRepository).save(argThat(history ->
+                history.isSuccess() && history.getArticleCount() == 1));
+    }
+
+    @Test
+    @DisplayName("크롤링 실패 시 실패 이력이 저장된다.")
+    void fetchRssData_savesCrawlHistoryOnFailure() {
+        when(webClient.get()).thenReturn(requestHeadersUriSpec);
+        when(requestHeadersUriSpec.uri(any(java.net.URI.class))).thenReturn(requestHeadersSpec);
+        when(requestHeadersSpec.retrieve()).thenThrow(new RuntimeException("Connection refused"));
+
+        gameNewsService.fetchRssData("게임", 10, null);
+
+        verify(crawlHistoryRepository).save(argThat(history ->
+                !history.isSuccess() && history.getErrorMessage().contains("Connection refused")));
     }
 }
