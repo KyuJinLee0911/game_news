@@ -25,6 +25,8 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+COMPOSE_CMD="docker compose -f docker-compose.prod.yml --env-file .env.prod --env-file gamenews/.env"
+
 # Check if Docker is installed
 if ! command -v docker &> /dev/null; then
     print_error "Docker is not installed. Please install Docker first."
@@ -46,25 +48,34 @@ if [ ! -f .env.prod ]; then
     exit 1
 fi
 
+# Check if gamenews/.env exists
+if [ ! -f gamenews/.env ]; then
+    print_error "gamenews/.env file not found. Please create it with the required variables."
+    print_error "Example:"
+    print_error "  DB_PASSWORD=your_secure_password"
+    print_error "  ALLOWED_ORIGIN=https://your-domain.com"
+    exit 1
+fi
+
 # Stop existing containers
 print_message "Stopping existing containers..."
-docker compose -f docker-compose.prod.yml --env-file .env.prod down
+$COMPOSE_CMD down
 
 # Remove old images (optional)
 read -p "Do you want to remove old images? (y/N): " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     print_message "Removing old images..."
-    docker compose -f docker-compose.prod.yml --env-file .env.prod down --rmi all
+    $COMPOSE_CMD down --rmi all
 fi
 
 # Pull latest images
 print_message "Pulling latest images from Docker Hub..."
-docker compose -f docker-compose.prod.yml --env-file .env.prod pull
+$COMPOSE_CMD pull
 
 # Start containers
 print_message "Starting containers..."
-docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
+$COMPOSE_CMD up -d
 
 # Wait for services to be healthy
 print_message "Waiting for services to be healthy..."
@@ -72,7 +83,7 @@ sleep 10
 
 # Check container status
 print_message "Checking container status..."
-docker compose -f docker-compose.prod.yml --env-file .env.prod ps
+$COMPOSE_CMD ps
 
 # Show logs
 print_message "========================================="
@@ -85,15 +96,15 @@ echo "  - Frontend: http://localhost:3000"
 echo "  - Backend API: http://localhost:8080/api/news"
 echo ""
 echo "Useful commands:"
-echo "  - View logs: docker compose -f docker-compose.prod.yml --env-file .env.prod logs -f"
-echo "  - Stop services: docker compose -f docker-compose.prod.yml --env-file .env.prod down"
-echo "  - Restart services: docker compose -f docker-compose.prod.yml --env-file .env.prod restart"
-echo "  - View status: docker compose -f docker-compose.prod.yml --env-file .env.prod ps"
+echo "  - View logs: $COMPOSE_CMD logs -f"
+echo "  - Stop services: $COMPOSE_CMD down"
+echo "  - Restart services: $COMPOSE_CMD restart"
+echo "  - View status: $COMPOSE_CMD ps"
 echo ""
 
 # Ask if user wants to see logs
 read -p "Do you want to see the logs? (y/N): " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
-    docker compose -f docker-compose.prod.yml --env-file .env.prod logs -f
+    $COMPOSE_CMD logs -f
 fi
